@@ -8,12 +8,13 @@ UDP_IP = "0.0.0.0"
 
 sock = None
 thread_sock = None
+callbacks = []
 
 ##
 # Starts the UDP server
 # @param port
 #
-def start(port = 1414):
+def start(port = 1414, callback = None):
     global sock
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((UDP_IP, port))
@@ -21,6 +22,9 @@ def start(port = 1414):
     thread_sock = threading.Thread(target=listen_thread)
     thread_sock.daemon = True
     thread_sock.start()
+
+    if callback is not None:
+        callbacks.append(callback)
 
 def listen_thread():
     global sock
@@ -35,5 +39,6 @@ def listen_thread():
         gx = float(gx) / float(0xFFFF) + 0.5
         gy = float(gy) / float(0xFFFF) + 0.5
         gz = float(gz) / float(0xFFFF) + 0.5
-        print("A = ({}, {}, {}), G = ({}, {}, {})".format(ax, ay, az, gx, gy, gz))
+        for cb in callbacks:
+            cb(ax, ay, az, gx, gy, gz)
 
