@@ -27,8 +27,13 @@ def listen_thread():
 
     while True:
         data, addr = sock.recvfrom(2 * 6) # 6 values of 2 bytes
-        print("Received message: ", data)
         # Unpack data
         ax, ay, az, gx, gy, gz = struct.unpack("=hhhhhh", data)
+        ax = float(ax) / float(0xFFFF) + 0.5
+        ay = float(ay) / float(0xFFFF) + 0.5
+        az = float(az) / float(0xFFFF) + 0.5
+        gx = float(gx) / float(0xFFFF) + 0.5
+        gy = float(gy) / float(0xFFFF) + 0.5
+        gz = float(gz) / float(0xFFFF) + 0.5
         print("A = ({}, {}, {}), G = ({}, {}, {})".format(ax, ay, az, gx, gy, gz))
 
