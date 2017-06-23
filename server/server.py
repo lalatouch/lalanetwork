@@ -1,12 +1,13 @@
 #!/bin/env python3
 # -*- encoding: utf8 -*-
 
-import socket
+import socket, threading
 
 # Global definitions
 UDP_IP = "0.0.0.0"
 
 sock = None
+thread_sock = None
 
 ##
 # Starts the UDP server
@@ -16,6 +17,10 @@ def start(port = 1414):
     global sock
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((UDP_IP, port))
+
+    thread_sock = threading.Thread(target=listen_thread)
+    thread_sock.daemon = True
+    thread_sock.start()
 
 def listen_thread():
     global sock
