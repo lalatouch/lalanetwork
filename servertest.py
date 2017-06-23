@@ -2,7 +2,7 @@
 
 from server import server
 
-def dump():
+def dump(ax, ay, az, gx, gy, gz):
     print("A = ({}, {}, {}), G = ({}, {}, {})".format(ax, ay, az, gx, gy, gz))
 
 server.start(callback = dump)
