@@ -1,7 +1,7 @@
 #!/bin/env python3
 # -*- encoding: utf8 -*-
 
-import socket, threading
+import socket, threading, struct
 
 # Global definitions
 UDP_IP = "0.0.0.0"
@@ -26,6 +26,9 @@ def listen_thread():
     global sock
 
     while True:
-        data, addr = sock.recvfrom(1024)
+        data, addr = sock.recvfrom(2 * 6) # 6 values of 2 bytes
         print("Received message: ", data)
+        # Unpack data
+        ax, ay, az, gx, gy, gz = struct.unpack("=hhhhhh", data)
+        print("A = ({}, {}, {}), G = ({}, {}, {})".format(ax, ay, az, gx, gy, gz))
 
