@@ -8,10 +8,13 @@ import time
 import collections
 
 center = 0.5
+rollback = 50
 gesture_buffer = collections.deque(maxlen=200)
-thres_buffer = collections.deque(maxlen=200)
 gesture_recording_idx = -1
 classifier = None
+
+tmp_fig = plt.figure()
+tmp_fig.show()
 
 class Classifier:
     """ Simple KNN classifier trained with what's in 'train', evaluated with
@@ -122,20 +125,29 @@ def dump(ax, ay, az, gx, gy, gz):
 
     # Save to buffer
     gesture_buffer.append([ax, ay, az, gx, gy, gz])
-    thres_buffer.append((ax-center)**2 + (ay-center)**2 + (az-center)**2)
 
     # TODO: Calibrate this value
-    if len(thres_buffer) > 20 and numpy.sum(list(thres_buffer)[-20:-1]) > 0.1 and gesture_recording_idx == -1:
-        gesture_recording_idx = 0
+    # Start recording conditions :
+    # - At least rollback samples
+    # - Not already recording
+    # - rollback last samples are all outside of [0.45, 0.55] (2nd if)
+    if len(gesture_buffer) > rollback and gesture_recording_idx == -1:
+        np_buffer_window = numpy.array(list(gesture_buffer)[-rollback:-1]) - center
+        np_buffer_window_outside_up = np_buffer_window > 0.55
+        np_buffer_window_outside_down = np_buffer_window < 0.45
+        if numpy.all(np_buffer_window_outside_up + np_buffer_window_outside_down):
+            gesture_recording_idx = 0
 
     if gesture_recording_idx != -1:
         gesture_recording_idx += 1
         # To keep n points before recognition, substract them to the maxlen of queue
-        if gesture_recording_idx == 180:
-            # Gesture is recorded, stop now
-            gesture_recording_idx = -1
-            # And send to classifier
+        if gesture_recording_idx == 200 - rollback:
+            plt.clf()
+            tmp_fig.plot(numpy.array(gesture_buffer)[:, 0:-1:6])
+            # Send to classifier
             classifier.classify_gesture([i for axis in list(gesture_buffer) for i in axis])
+            # Gesture is recorded, stop
+            gesture_recording_idx = -1
 
 def helper():
     print("Press enter to finish")
@@ -151,6 +163,16 @@ def main():
 
     # Instanciate a UDP server
     server.start(callback = dump)
+
+    # Fake cb
+    test_dataset = classifier.X_test
+    print(len(test_dataset))
+
+    for s in range(len(test_dataset)):
+        for i in range(0, len(test_dataset[0])-10, 6):
+            dump(*test_dataset[s][i:i+6])
+        print("Should be: " + classifier.trained_gestures[classifier.__predict_to_corr__(classifier.Y_test[s])])
+        time.sleep(1)
 
 if __name__ == '__main__':
     helper();
