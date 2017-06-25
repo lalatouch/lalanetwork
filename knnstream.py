@@ -16,7 +16,7 @@ started = False
 center = [0.5]*6
 rollback = 50
 gesture_buffer = collections.deque(maxlen=200)
-gesture_recording_idx = -1
+gesture_recording_idx = -600
 classifier = None
 calibrating = True
 to_plot = []
@@ -34,10 +34,10 @@ class Classifier:
     }
 
     training_files = {
-        0: ['train/0-didjcodt.npy'],
-        1: ['train/1-didjcodt.npy'],
-        2: ['train/2-didjcodt.npy'],
-        3: ['train/3-didjcodt.npy']
+        0: ['train/0-didjcodt.npy', 'train/0-didjcodt2.npy'],
+        1: ['train/1-didjcodt.npy', 'train/1-didjcodt2.npy'],
+        2: ['train/2-didjcodt.npy', 'train/2-didjcodt2.npy'],
+        3: ['train/3-didjcodt.npy', 'train/3-didjcodt2.npy']
     }
 
     validation_files = {
