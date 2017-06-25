@@ -8,10 +8,11 @@ import time
 import collections
 
 # Change this if you want to record data
-record_new_dataset = True
+record_new_dataset = False
 recording = 0
 record_dataset = []
 
+started = False
 center = [0.5]*6
 rollback = 50
 gesture_buffer = collections.deque(maxlen=200)
@@ -32,17 +33,17 @@ class Classifier:
     }
 
     training_files = {
-        0: ['train/leftStay.npy', 'train/leftStay2.npy', 'train/TuetuopayLeftStay.npy'],
-        1: ['train/leftBack.npy', 'train/TuetuopayLeftBack.npy'],
-        2: ['train/rightStay.npy', 'train/rightStay2.npy', 'train/TuetuopayRightStay.npy'],
-        3: ['train/rightBack.npy', 'train/TuetuopayRightBack.npy']
+        0: ['train/0-didjcodt.npy'],
+        1: ['train/1-didjcodt.npy'],
+        2: ['train/2-didjcodt.npy'],
+        3: ['train/3-didjcodt.npy']
     }
 
     validation_files = {
-        0: ['test/testLeftStay.npy'],
-        1: ['test/testLeftBack.npy'],
-        2: ['test/testRightStay.npy', 'train/mattRightStay.npy'],
-        3: ['test/testRightBack.npy']
+        0: ['test/0-didjcodt.npy'],
+        1: ['test/1-didjcodt.npy'],
+        2: ['test/2-didjcodt.npy'],
+        3: ['test/3-didjcodt.npy']
     }
 
     def __predict_to_corr__(self, prediction, thres=0.5):
@@ -146,17 +147,16 @@ def dump(ax, ay, az, gx, gy, gz):
             record_dataset.append(list(gesture_buffer))
             numpy.save("training", numpy.array(record_dataset))
             recording = -600
-    else:
+    elif started:
         # TODO: Calibrate this value
         # Start recording conditions :
-        # - At least rollback samples
         # - Not already recording
         # - rollback last samples are all outside of [0.45, 0.55] (2nd if)
-        if len(gesture_buffer) > rollback and gesture_recording_idx == -1:
+        if gesture_recording_idx == -1:
             np_buffer_window = numpy.array(list(gesture_buffer)[-rollback:-1])
-            np_buffer_window_outside_up = np_buffer_window > 0.05
-            np_buffer_window_outside_down = np_buffer_window < -0.05
-            if numpy.all(np_buffer_window_outside_up + np_buffer_window_outside_down):
+            np_buffer_window_outside_up = np_buffer_window > 0.10
+            np_buffer_window_outside_down = np_buffer_window < -0.10
+            if numpy.any(np_buffer_window_outside_up + np_buffer_window_outside_down):
                 gesture_recording_idx = 0
 
         if gesture_recording_idx != -1:
@@ -185,7 +185,7 @@ def calibrate():
               numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 5]))]
 
 def main():
-    global classifier, calibrating
+    global classifier, calibrating, started
     if not record_new_dataset:
         # Prepare the classifier
         classifier = Classifier()
@@ -195,13 +195,16 @@ def main():
 
 
     # Instanciate a UDP server
-    server.start(callback = dump)
+    #server.start(callback = dump)
 
     # Get zero value
     print("Press enter to start calibration, hit <C-c> when finished")
     input()
     calibrate()
     calibrating = False
+    # Flush the buffer
+    time.sleep(1)
+    started = True
 
     plt.ion()
     while True:
