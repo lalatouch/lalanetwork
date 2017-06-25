@@ -7,14 +7,12 @@ import numpy
 import time
 import collections
 
-center = 0.5
+center = [0.5]*6
 rollback = 50
 gesture_buffer = collections.deque(maxlen=200)
 gesture_recording_idx = -1
 classifier = None
-
-tmp_fig = plt.figure()
-tmp_fig.show()
+calibrating = True
 
 class Classifier:
     """ Simple KNN classifier trained with what's in 'train', evaluated with
@@ -124,7 +122,12 @@ def dump(ax, ay, az, gx, gy, gz):
     global gesture_buffer, gesture_recording_idx
 
     # Save to buffer
-    gesture_buffer.append([ax, ay, az, gx, gy, gz])
+
+    if calibrating:
+        gesture_buffer.append([ax, ay, az, gx, gy, gz])
+        return
+
+    gesture_buffer.append([ax - center[0], ay - center[1], az - center[2], gx - center[3], gy - center[4], gz - center[5]])
 
     # TODO: Calibrate this value
     # Start recording conditions :
@@ -132,9 +135,9 @@ def dump(ax, ay, az, gx, gy, gz):
     # - Not already recording
     # - rollback last samples are all outside of [0.45, 0.55] (2nd if)
     if len(gesture_buffer) > rollback and gesture_recording_idx == -1:
-        np_buffer_window = numpy.array(list(gesture_buffer)[-rollback:-1]) - center
-        np_buffer_window_outside_up = np_buffer_window > 0.55
-        np_buffer_window_outside_down = np_buffer_window < 0.45
+        np_buffer_window = numpy.array(list(gesture_buffer)[-rollback:-1])
+        np_buffer_window_outside_up = np_buffer_window > 0.05
+        np_buffer_window_outside_down = np_buffer_window < -0.05
         if numpy.all(np_buffer_window_outside_up + np_buffer_window_outside_down):
             gesture_recording_idx = 0
 
@@ -142,8 +145,7 @@ def dump(ax, ay, az, gx, gy, gz):
         gesture_recording_idx += 1
         # To keep n points before recognition, substract them to the maxlen of queue
         if gesture_recording_idx == 200 - rollback:
-            plt.clf()
-            tmp_fig.plot(numpy.array(gesture_buffer)[:, 0:-1:6])
+
             # Send to classifier
             classifier.classify_gesture([i for axis in list(gesture_buffer) for i in axis])
             # Gesture is recorded, stop
@@ -151,28 +153,55 @@ def dump(ax, ay, az, gx, gy, gz):
 
 def helper():
     print("Press enter to finish")
-    time.sleep(1)
+    time.sleep(0.1)
+
+def calibrate():
+    global center
+    while(len(gesture_buffer) < 200):
+        time.sleep(0.1)
+    center = [numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 0:-1:6])), \
+              numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 1:-1:6])), \
+              numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 2:-1:6])), \
+              numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 3:-1:6])), \
+              numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 4:-1:6])), \
+              numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 5:-1:6]))]
 
 def main():
-    global classifier
+    global classifier, calibrating
     # Prepare the classifier
     classifier = Classifier()
 
     # Check it
     classifier.evaluate_knn()
 
+
     # Instanciate a UDP server
     server.start(callback = dump)
 
-    # Fake cb
-    test_dataset = classifier.X_test
-    print(len(test_dataset))
+    # Get zero value
+    time.sleep(1)
+    calibrate()
+    calibrating = False
 
-    for s in range(len(test_dataset)):
-        for i in range(0, len(test_dataset[0])-10, 6):
-            dump(*test_dataset[s][i:i+6])
-        print("Should be: " + classifier.trained_gestures[classifier.__predict_to_corr__(classifier.Y_test[s])])
-        time.sleep(1)
+    plt.ion()
+    while True:
+        plt.pause(0.1)
+        plt.clf()
+        plt.axis([0, 200, -1, 1])
+        plt.plot(list(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 0:-1:6])))
+        plt.plot(list(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 1:-1:6])))
+        plt.plot(list(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 2:-1:6])))
+        #plt.show()
+
+    # Fake cb
+    #test_dataset = classifier.X_test
+    #print(len(test_dataset))
+
+    #for s in range(len(test_dataset)):
+    #    for i in range(0, len(test_dataset[0])-10, 6):
+    #        dump(*test_dataset[s][i:i+6])
+    #    print("Should be: " + classifier.trained_gestures[classifier.__predict_to_corr__(classifier.Y_test[s])])
+    #    time.sleep(1)
 
 if __name__ == '__main__':
     helper();
