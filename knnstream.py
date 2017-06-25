@@ -15,6 +15,7 @@ record_dataset = []
 started = False
 center = [0.5]*6
 rollback = 50
+threshold = 0.15
 gesture_buffer = collections.deque(maxlen=200)
 gesture_recording_idx = -600
 classifier = None
@@ -158,8 +159,8 @@ def dump(ax, ay, az, gx, gy, gz):
         # - rollback last samples are all outside of [0.45, 0.55] (2nd if)
         if gesture_recording_idx == -1:
             np_buffer_window = numpy.array(list(gesture_buffer)[-rollback:-1])
-            np_buffer_window_outside_up = np_buffer_window > 0.10
-            np_buffer_window_outside_down = np_buffer_window < -0.10
+            np_buffer_window_outside_up = np_buffer_window > threshold
+            np_buffer_window_outside_down = np_buffer_window < -threshold
             if numpy.any(np_buffer_window_outside_up + np_buffer_window_outside_down):
                 gesture_recording_idx = 0
 
