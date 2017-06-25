@@ -19,6 +19,7 @@ gesture_buffer = collections.deque(maxlen=200)
 gesture_recording_idx = -1
 classifier = None
 calibrating = True
+to_plot = []
 
 class Classifier:
     """ Simple KNN classifier trained with what's in 'train', evaluated with
@@ -66,14 +67,17 @@ class Classifier:
             gesture index
         """
         tmpX = numpy.load(fn)
+        shaped_X = []
+        for sample in tmpX:
+             shaped_X.append(numpy.concatenate((sample[:, 0], sample[:, 1], sample[:, 2], sample[:, 3], sample[:, 4], sample[:, 5])))
         # Remove one to remove the 'No Gesture' gesture :)
         tmpY = numpy.ones(len(self.trained_gestures) - 1)*0
         tmpY[Yidx] = 1
 
         if isFirst:
-            X = tmpX
+            X = shaped_X
         else:
-            X = numpy.concatenate((X, tmpX))
+            X = numpy.concatenate((X, shaped_X))
         for i in range(len(tmpX)):
             Y.append(tmpY.tolist())
 
@@ -91,7 +95,6 @@ class Classifier:
                         gesture, cur_file, isFirst=firstIter)
                 if firstIter:
                     firstIter = False
-        X = X.reshape(X.shape[0], X.shape[1]*X.shape[2])
 
         return (X, Y)
 
@@ -121,11 +124,12 @@ class Classifier:
         """
         prediction = self.knn.predict(numpy.reshape(gesture, (1, -1)))[0]
         prediction_idx = self.__predict_to_corr__(prediction)
+        print(prediction)
         print("Recognized " + self.trained_gestures[prediction_idx])
         return prediction_idx
 
 def dump(ax, ay, az, gx, gy, gz):
-    global gesture_buffer, gesture_recording_idx, recording, record_dataset
+    global gesture_buffer, gesture_recording_idx, recording, record_dataset, to_plot
 
     # Save to buffer
 
@@ -159,15 +163,20 @@ def dump(ax, ay, az, gx, gy, gz):
             if numpy.any(np_buffer_window_outside_up + np_buffer_window_outside_down):
                 gesture_recording_idx = 0
 
-        if gesture_recording_idx != -1:
+        elif gesture_recording_idx >= 0:
             gesture_recording_idx += 1
             # To keep n points before recognition, substract them to the maxlen of queue
             if gesture_recording_idx == 200 - rollback:
 
                 # Send to classifier
-                classifier.classify_gesture([i for axis in list(gesture_buffer) for i in axis])
-                # Gesture is recorded, stop
-                gesture_recording_idx = -1
+                recorded_gesture = numpy.array(list(gesture_buffer))
+                to_plot = [recorded_gesture[:, 0], recorded_gesture[:, 1], recorded_gesture[:, 2], recorded_gesture[:, 3], recorded_gesture[:, 4], recorded_gesture[:, 5]]
+                classifier.classify_gesture(numpy.concatenate((to_plot[0], to_plot[1], to_plot[2], to_plot[3], to_plot[4], to_plot[5])))
+                # Gesture is recorded, stop and wait for at least 100 samples before recognizing other gesture
+                gesture_recording_idx = -100
+
+        else:
+            gesture_recording_idx += 1
 
 def helper():
     print("Press enter to finish")
@@ -195,7 +204,7 @@ def main():
 
 
     # Instanciate a UDP server
-    #server.start(callback = dump)
+    server.start(callback = dump)
 
     # Get zero value
     print("Press enter to start calibration, hit <C-c> when finished")
@@ -211,9 +220,14 @@ def main():
         plt.pause(0.1)
         plt.clf()
         plt.axis([0, 200, -1, 1])
-        plt.plot(list(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 0:-1:6])))
-        plt.plot(list(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 1:-1:6])))
-        plt.plot(list(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 2:-1:6])))
+        #plt.plot(list(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 0:-1:6])))
+        #plt.plot(list(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 1:-1:6])))
+        #plt.plot(list(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 2:-1:6])))
+        if len(to_plot) > 0:
+            plt.plot(to_plot[0])
+            plt.plot(to_plot[1])
+            plt.plot(to_plot[2])
+
         #plt.show()
 
     # Fake cb
