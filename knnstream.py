@@ -7,7 +7,11 @@ import numpy
 import time
 import collections
 
-gesture_buffer = collections.deque(maxlen=200*6)
+center = 0.5
+gesture_buffer = collections.deque(maxlen=200)
+thres_buffer = collections.deque(maxlen=200)
+gesture_recording_idx = -1
+classifier = None
 
 class Classifier:
     """ Simple KNN classifier trained with what's in 'train', evaluated with
@@ -108,24 +112,37 @@ class Classifier:
     def classify_gesture(self, gesture):
         """ Categorize a gesture and return its ID, or -1 if it failed to detect any gesture
         """
-        prediction = self.knn.preduct(gesture)
-        return self.__predict_to_corr__(prediction)
+        prediction = self.knn.predict(numpy.reshape(gesture, (1, -1)))[0]
+        prediction_idx = self.__predict_to_corr__(prediction)
+        print("Recognized " + self.trained_gestures[prediction_idx])
+        return prediction_idx
 
 def dump(ax, ay, az, gx, gy, gz):
-    global gesture_buffer
-    gesture_buffer.append(ax)
-    gesture_buffer.append(ay)
-    gesture_buffer.append(az)
-    gesture_buffer.append(gx)
-    gesture_buffer.append(gy)
-    gesture_buffer.append(gz)
-    print("A = ({}, {}, {}), G = ({}, {}, {})".format(ax, ay, az, gx, gy, gz))
+    global gesture_buffer, gesture_recording_idx
+
+    # Save to buffer
+    gesture_buffer.append([ax, ay, az, gx, gy, gz])
+    thres_buffer.append((ax-center)**2 + (ay-center)**2 + (az-center)**2)
+
+    # TODO: Calibrate this value
+    if len(thres_buffer) > 20 and numpy.sum(list(thres_buffer)[-20:-1]) > 0.1 and gesture_recording_idx == -1:
+        gesture_recording_idx = 0
+
+    if gesture_recording_idx != -1:
+        gesture_recording_idx += 1
+        # To keep n points before recognition, substract them to the maxlen of queue
+        if gesture_recording_idx == 180:
+            # Gesture is recorded, stop now
+            gesture_recording_idx = -1
+            # And send to classifier
+            classifier.classify_gesture([i for axis in list(gesture_buffer) for i in axis])
 
 def helper():
     print("Press enter to finish")
     time.sleep(1)
 
 def main():
+    global classifier
     # Prepare the classifier
     classifier = Classifier()
 
