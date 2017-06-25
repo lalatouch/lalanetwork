@@ -7,6 +7,11 @@ import numpy
 import time
 import collections
 
+# Change this if you want to record data
+record_new_dataset = True
+recording = 0
+record_dataset = []
+
 center = [0.5]*6
 rollback = 50
 gesture_buffer = collections.deque(maxlen=200)
@@ -119,7 +124,7 @@ class Classifier:
         return prediction_idx
 
 def dump(ax, ay, az, gx, gy, gz):
-    global gesture_buffer, gesture_recording_idx
+    global gesture_buffer, gesture_recording_idx, recording, record_dataset
 
     # Save to buffer
 
@@ -129,27 +134,40 @@ def dump(ax, ay, az, gx, gy, gz):
 
     gesture_buffer.append([ax - center[0], ay - center[1], az - center[2], gx - center[3], gy - center[4], gz - center[5]])
 
-    # TODO: Calibrate this value
-    # Start recording conditions :
-    # - At least rollback samples
-    # - Not already recording
-    # - rollback last samples are all outside of [0.45, 0.55] (2nd if)
-    if len(gesture_buffer) > rollback and gesture_recording_idx == -1:
-        np_buffer_window = numpy.array(list(gesture_buffer)[-rollback:-1])
-        np_buffer_window_outside_up = np_buffer_window > 0.05
-        np_buffer_window_outside_down = np_buffer_window < -0.05
-        if numpy.all(np_buffer_window_outside_up + np_buffer_window_outside_down):
-            gesture_recording_idx = 0
+    if record_new_dataset:
+        if recording < 0:
+            print("Record start in " + str(recording*1./200) + "s")
+            recording += 1
+            return
+        print("A = ({}, {}, {}), G = ({}, {}, {})".format(ax, ay, az, gx, gy, gz))
+        recording += 1
 
-    if gesture_recording_idx != -1:
-        gesture_recording_idx += 1
-        # To keep n points before recognition, substract them to the maxlen of queue
-        if gesture_recording_idx == 200 - rollback:
+        if recording == 200:
+            record_dataset.append(list(gesture_buffer))
+            numpy.save("training", numpy.array(record_dataset))
+            recording = -600
+    else:
+        # TODO: Calibrate this value
+        # Start recording conditions :
+        # - At least rollback samples
+        # - Not already recording
+        # - rollback last samples are all outside of [0.45, 0.55] (2nd if)
+        if len(gesture_buffer) > rollback and gesture_recording_idx == -1:
+            np_buffer_window = numpy.array(list(gesture_buffer)[-rollback:-1])
+            np_buffer_window_outside_up = np_buffer_window > 0.05
+            np_buffer_window_outside_down = np_buffer_window < -0.05
+            if numpy.all(np_buffer_window_outside_up + np_buffer_window_outside_down):
+                gesture_recording_idx = 0
 
-            # Send to classifier
-            classifier.classify_gesture([i for axis in list(gesture_buffer) for i in axis])
-            # Gesture is recorded, stop
-            gesture_recording_idx = -1
+        if gesture_recording_idx != -1:
+            gesture_recording_idx += 1
+            # To keep n points before recognition, substract them to the maxlen of queue
+            if gesture_recording_idx == 200 - rollback:
+
+                # Send to classifier
+                classifier.classify_gesture([i for axis in list(gesture_buffer) for i in axis])
+                # Gesture is recorded, stop
+                gesture_recording_idx = -1
 
 def helper():
     print("Press enter to finish")
@@ -159,27 +177,29 @@ def calibrate():
     global center
     while(len(gesture_buffer) < 200):
         time.sleep(0.1)
-    center = [numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 0:-1:6])), \
-              numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 1:-1:6])), \
-              numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 2:-1:6])), \
-              numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 3:-1:6])), \
-              numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 4:-1:6])), \
-              numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 5:-1:6]))]
+    center = [numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 0])), \
+              numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 1])), \
+              numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 2])), \
+              numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 3])), \
+              numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 4])), \
+              numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 5]))]
 
 def main():
     global classifier, calibrating
-    # Prepare the classifier
-    classifier = Classifier()
+    if not record_new_dataset:
+        # Prepare the classifier
+        classifier = Classifier()
 
-    # Check it
-    classifier.evaluate_knn()
+        # Check it
+        classifier.evaluate_knn()
 
 
     # Instanciate a UDP server
     server.start(callback = dump)
 
     # Get zero value
-    time.sleep(1)
+    print("Press enter to start calibration, hit <C-c> when finished")
+    input()
     calibrate()
     calibrating = False
 
