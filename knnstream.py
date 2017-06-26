@@ -24,17 +24,40 @@ classifier = None
 calibrating = True
 to_plot = []
 
-G_LEFT_AND_STAY, G_LEFT_AND_BACK, G_RIGHT_AND_STAY, G_RIGHT_AND_BACK = 0, 1, 2, 3
+class GestureToAction:
+    """ Receives a gesture and makes the corresponding action
+    """
+    action_api_gestures = {
+        0: ['/fast/backward/go', '/fast/forward/stop'],
+        1: ['/playlist/previous', '/playlist/previous'],
+        2: ['/fast/forward/go', '/fast/backward/stop'],
+        3: ['/playlist/next', '/playlist/next'],
+        4: ['/cur-track/volume/reg/up', '/cur-track/volume/reg/down'],
+        5: ['/cur-track/volume/reg/down', '/cur-track/volume/reg/up'],
+        6: ['/playlist/shuffle', '/playlist/shuffle']
+    }
 
-API_URL = os.environ.get("API_URL", None)
-if API_URL is None: API_URL = "localhost"
-API_PORT = os.environ.get("API_PORT", None)
-if API_PORT is None: API_PORT = 3000
+    stateful_gestures = [0, 2, 4, 5]
 
-print("API is at {}:{}".format(API_URL, API_PORT))
+    def __api_get__(self, action):
+        print(action)
+       #return urlopen("http://{}:{}/api{}".format(self.url, self.port, action))
 
-def api_get(url):
-    return urlopen("http://{}:{}/api{}".format(API_URL, API_PORT, url))
+    def __init__(self):
+        self.state = 0
+
+        self.url = os.environ.get("API_URL", None)
+        if self.url is None: self.url = "localhost"
+        self.port = os.environ.get("API_PORT", None)
+        if self.port is None: self.port = 3000
+
+    def make_action(self, gesture):
+        """ Make the corresponding action based on current state and recognized gesture """
+        self.__api_get__(self.action_api_gestures[gesture][self.state])
+        # Change state if action is stateful
+        if gesture in self.stateful_gestures:
+            self.state = 1 - self.state
+
 
 class Classifier:
     """ Simple KNN classifier trained with what's in 'train', evaluated with
@@ -46,20 +69,29 @@ class Classifier:
         1: 'Left and Back',
         2: 'Right and Stay',
         3: 'Right and Back',
+        4: 'Turn CW',
+        5: 'Turn CCW'
+        6: 'Shuffle'
     }
 
     training_files = {
         0: ['train/0-didjcodt.npy', 'train/0-didjcodt2.npy', 'train/0-tuetuopay.npy'],
         1: ['train/1-didjcodt.npy', 'train/1-didjcodt2.npy', 'train/1-tuetuopay.npy'],
         2: ['train/2-didjcodt.npy', 'train/2-didjcodt2.npy', 'train/2-tuetuopay.npy'],
-        3: ['train/3-didjcodt.npy', 'train/3-didjcodt2.npy', 'train/3-tuetuopay.npy']
+        3: ['train/3-didjcodt.npy', 'train/3-didjcodt2.npy', 'train/3-tuetuopay.npy'],
+        4: ['train/4-didjcodt.npy', 'train/4-didjcodt2.npy', 'train/4-tuetuopay.npy'],
+        5: ['train/5-didjcodt.npy', 'train/5-didjcodt2.npy', 'train/5-tuetuopay.npy'],
+        6: ['train/6-didjcodt.npy', 'train/6-didjcodt2.npy', 'train/6-tuetuopay.npy']
     }
 
     validation_files = {
         0: ['test/0-didjcodt.npy'],
         1: ['test/1-didjcodt.npy'],
         2: ['test/2-didjcodt.npy'],
-        3: ['test/3-didjcodt.npy']
+        3: ['test/3-didjcodt.npy'],
+        4: ['test/4-didjcodt.npy'],
+        5: ['test/5-didjcodt.npy'],
+        6: ['test/6-didjcodt.npy']
     }
 
     def __predict_to_corr__(self, prediction, thres=0.5):
@@ -118,9 +150,7 @@ class Classifier:
         self.X_test, self.Y_test = self.__import_dataset__(self.validation_files)
         self.knn = KNeighborsClassifier(n_neighbors=5)
         self.knn.fit(self.X_train, self.Y_train)
-
-        # For API client
-        self.fast_moving = False
+        self.actionner = GestureToAction()
 
     def evaluate_knn(self):
         """ Evaluate the KNN with validation data set and return accuracy of the KNN
@@ -144,31 +174,9 @@ class Classifier:
         prediction_idx = self.__predict_to_corr__(prediction)
         print(prediction)
         print("Recognized " + self.trained_gestures[prediction_idx])
+        if prediction_idx != -1:
+            self.actionner.make_action(prediction_idx)
 
-        if prediction_idx == G_RIGHT_AND_BACK:
-            # TODO : next song
-            print("TODO")
-        elif prediction_idx == G_LEFT_AND_BACK:
-            # TODO : previous song
-            print("TODO")
-        elif prediction_idx == G_RIGHT_AND_STAY:
-            # Differentiate between fast-forward and stop backwards
-            if self.fast_moving:
-                # Stop going backwards
-                api_get("/curTracks/fast/backward/stop")
-            else:
-                # Fast forward
-                api_get("/curTracks/fast/forward/go")
-            self.fast_moving = not self.fast_moving
-        elif prediction_idx == G_LEFT_AND_STAY:
-            # Differentiate between backward and stop forward
-            if self.fast_moving:
-                # Stop going forward
-                api_get("/curTracks/fast/forward/stop")
-            else:
-                # Fast backward
-                api_get("/curTracks/fast/backward/go")
-            self.fast_moving = not self.fast_moving
         return prediction_idx
 
 def dump(ax, ay, az, gx, gy, gz):
