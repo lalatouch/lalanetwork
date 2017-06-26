@@ -6,6 +6,8 @@ from matplotlib import pyplot as plt
 import numpy
 import time
 import collections
+from urllib.request import urlopen
+import os
 
 # Change this if you want to record data
 record_new_dataset = False
@@ -20,6 +22,18 @@ gesture_recording_idx = -600
 classifier = None
 calibrating = True
 to_plot = []
+
+G_LEFT_AND_STAY, G_LEFT_AND_BACK, G_RIGHT_AND_STAY, G_RIGHT_AND_BACK = 0, 1, 2, 3
+
+API_URL = os.environ.get("API_URL", None)
+if API_URL is None: API_URL = "localhost"
+API_PORT = os.environ.get("API_PORT", None)
+if API_PORT is None: API_PORT = 3000
+
+print("API is at {}:{}".format(API_URL, API_PORT))
+
+def api_get(url):
+    return urlopen("http://{}:{}/api{}".format(API_URL, API_PORT, url))
 
 class Classifier:
     """ Simple KNN classifier trained with what's in 'train', evaluated with
@@ -104,6 +118,9 @@ class Classifier:
         self.knn = KNeighborsClassifier(n_neighbors=5)
         self.knn.fit(self.X_train, self.Y_train)
 
+        # For API client
+        self.fast_moving = False
+
     def evaluate_knn(self):
         """ Evaluate the KNN with validation data set and return accuracy of the KNN
         """
@@ -126,6 +143,31 @@ class Classifier:
         prediction_idx = self.__predict_to_corr__(prediction)
         print(prediction)
         print("Recognized " + self.trained_gestures[prediction_idx])
+
+        if prediction_idx == G_RIGHT_AND_BACK:
+            # TODO : next song
+            print("TODO")
+        elif prediction_idx == G_LEFT_AND_BACK:
+            # TODO : previous song
+            print("TODO")
+        elif prediction_idx == G_RIGHT_AND_STAY:
+            # Differentiate between fast-forward and stop backwards
+            if self.fast_moving:
+                # Stop going backwards
+                api_get("/curTracks/fast/backward/stop")
+            else:
+                # Fast forward
+                api_get("/curTracks/fast/forward/go")
+            self.fast_moving = not self.fast_moving
+        elif prediction_idx == G_LEFT_AND_STAY:
+            # Differentiate between backward and stop forward
+            if self.fast_moving:
+                # Stop going forward
+                api_get("/curTracks/fast/forward/stop")
+            else:
+                # Fast backward
+                api_get("/curTracks/fast/backward/go")
+            self.fast_moving = not self.fast_moving
         return prediction_idx
 
 def dump(ax, ay, az, gx, gy, gz):
