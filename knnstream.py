@@ -34,10 +34,10 @@ class Classifier:
     }
 
     training_files = {
-        0: ['train/0-didjcodt.npy', 'train/0-didjcodt2.npy'],
-        1: ['train/1-didjcodt.npy', 'train/1-didjcodt2.npy'],
-        2: ['train/2-didjcodt.npy', 'train/2-didjcodt2.npy'],
-        3: ['train/3-didjcodt.npy', 'train/3-didjcodt2.npy']
+        0: ['train/0-didjcodt.npy', 'train/0-didjcodt2.npy', 'train/0-tuetuopay.npy'],
+        1: ['train/1-didjcodt.npy', 'train/1-didjcodt2.npy', 'train/1-tuetuopay.npy'],
+        2: ['train/2-didjcodt.npy', 'train/2-didjcodt2.npy', 'train/2-tuetuopay.npy'],
+        3: ['train/3-didjcodt.npy', 'train/3-didjcodt2.npy', 'train/3-tuetuopay.npy']
     }
 
     validation_files = {
