@@ -18,7 +18,7 @@ started = False
 center = [0.5]*6
 rollback = 50
 threshold = 0.15
-gesture_buffer = collections.deque(maxlen=200)
+gesture_buffer = collections.deque(maxlen=400)
 gesture_recording_idx = -600
 classifier = None
 calibrating = True
@@ -32,12 +32,13 @@ class GestureToAction:
         1: ['/playlist/previous', '/playlist/previous'],
         2: ['/fast/forward/go', '/fast/backward/stop'],
         3: ['/playlist/next', '/playlist/next'],
-        4: ['/cur-track/volume/reg/up', '/cur-track/volume/reg/down'],
-        5: ['/cur-track/volume/reg/down', '/cur-track/volume/reg/up'],
-        6: ['/playlist/shuffle', '/playlist/shuffle']
+        4: ['/cur-track/volume/reg/up', '/cur-track/volume/reg/stop'],
+        5: ['/cur-track/volume/reg/down', '/cur-track/volume/reg/stop'],
+        6: ['/playlist/shuffle', '/playlist/shuffle'],
+	7: ['/cur-track/play', '/cur-track/pause']
     }
 
-    stateful_gestures = [0, 2, 4, 5]
+    stateful_gestures = [0, 2, 4, 5, 7]
 
     def __api_get__(self, action):
         print(action)
@@ -70,28 +71,30 @@ class Classifier:
         2: 'Right and Stay',
         3: 'Right and Back',
         4: 'Turn CW',
-        5: 'Turn CCW'
-        6: 'Shuffle'
+        5: 'Turn CCW',
+        6: 'Shuffle',
+	7: 'Taptap'
     }
 
     training_files = {
-        0: ['train/0-didjcodt.npy', 'train/0-didjcodt2.npy', 'train/0-tuetuopay.npy'],
-        1: ['train/1-didjcodt.npy', 'train/1-didjcodt2.npy', 'train/1-tuetuopay.npy'],
-        2: ['train/2-didjcodt.npy', 'train/2-didjcodt2.npy', 'train/2-tuetuopay.npy'],
-        3: ['train/3-didjcodt.npy', 'train/3-didjcodt2.npy', 'train/3-tuetuopay.npy'],
-        4: ['train/4-didjcodt.npy', 'train/4-didjcodt2.npy', 'train/4-tuetuopay.npy'],
-        5: ['train/5-didjcodt.npy', 'train/5-didjcodt2.npy', 'train/5-tuetuopay.npy'],
-        6: ['train/6-didjcodt.npy', 'train/6-didjcodt2.npy', 'train/6-tuetuopay.npy']
+        0: ['train2/0-didjcodt.npy'],
+        1: ['train2/1-didjcodt.npy'],
+        2: ['train2/2-didjcodt.npy'],
+        3: ['train2/3-didjcodt.npy'],
+        4: ['train2/4-didjcodt.npy'],
+        5: ['train2/5-didjcodt.npy'],
+        6: ['train2/6-didjcodt.npy'],
+        7: ['train2/7-didjcodt.npy']
     }
 
     validation_files = {
-        0: ['test/0-didjcodt.npy'],
-        1: ['test/1-didjcodt.npy'],
-        2: ['test/2-didjcodt.npy'],
-        3: ['test/3-didjcodt.npy'],
-        4: ['test/4-didjcodt.npy'],
-        5: ['test/5-didjcodt.npy'],
-        6: ['test/6-didjcodt.npy']
+        0: ['test2/0-didjcodt.npy'],
+        #1: ['test/1-didjcodt.npy'],
+        #2: ['test/2-didjcodt.npy'],
+        #3: ['test/3-didjcodt.npy'],
+        #4: ['test/4-didjcodt.npy'],
+        #5: ['test/5-didjcodt.npy'],
+        #6: ['test/6-didjcodt.npy']
     }
 
     def __predict_to_corr__(self, prediction, thres=0.5):
@@ -198,7 +201,7 @@ def dump(ax, ay, az, gx, gy, gz):
         print("A = ({}, {}, {}), G = ({}, {}, {})".format(ax, ay, az, gx, gy, gz))
         recording += 1
 
-        if recording == 200:
+        if recording == 400:
             record_dataset.append(list(gesture_buffer))
             numpy.save("training", numpy.array(record_dataset))
             recording = -600
@@ -217,7 +220,7 @@ def dump(ax, ay, az, gx, gy, gz):
         elif gesture_recording_idx >= 0:
             gesture_recording_idx += 1
             # To keep n points before recognition, substract them to the maxlen of queue
-            if gesture_recording_idx == 200 - rollback:
+            if gesture_recording_idx == len(gesture_buffer) - rollback:
 
                 # Send to classifier
                 recorded_gesture = numpy.array(list(gesture_buffer))
@@ -235,7 +238,7 @@ def helper():
 
 def calibrate():
     global center
-    while(len(gesture_buffer) < 200):
+    while(len(gesture_buffer) < 400):
         time.sleep(0.1)
     center = [numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 0])), \
               numpy.mean(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 1])), \
@@ -270,7 +273,7 @@ def main():
     while True:
         plt.pause(0.1)
         plt.clf()
-        plt.axis([0, 200, -1, 1])
+        plt.axis([0, 400, -1, 1])
         #plt.plot(list(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 0:-1:6])))
         #plt.plot(list(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 1:-1:6])))
         #plt.plot(list(numpy.ndarray.flatten(numpy.array(gesture_buffer)[:, 2:-1:6])))
